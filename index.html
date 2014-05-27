@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+    font-size: 1em;
+    font-weight: normal;
+    -webkit-box-sizing: border-box;
+	   -moz-box-sizing: border-box;
+	        box-sizing: border-box;
+}
+img {
+   height: auto;
+   width:100%;
+}
+#pages {
+	position: relative;
+}
+#pages .pages-container img {
+	margin-bottom: 1em;
+}
+#pages .pages-navigation {
+	position: absolute;
+	top: 50%;
+	width: 100%;
+}
+#pages .pages-navigation .prev { left: 0; }
+#pages .pages-navigation .next { right: 0; float: right; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+	<div id="drag">Drag and Drop
+		<button id="zbutton">Select Rar or Zip Archive</button>
+	</div>
+	<input type="file" id="zipinput">
+	<div id="output"></div>
+</div>
+<div id="pages">
+    <div class="pages-container">
+    </div>
+	<!--
+    <nav class="pages-navigation">
+		<a href="#" class="prev">Previous</a>
+		<a href="#" class="next">Next</a>
+    </nav>
+	-->
+</div>
+<script type="text/javascript" src="js/zip.js"></script>
+<script type="text/javascript" src="js/rar.js"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="text/javascript" src="js/waypoints.js"></script>
+<!--
+<script type="text/javascript" src="js/jquery.easing.1.3.js"></script>
+<script type="text/javascript" src="js/jquery.animate-enhanced.min.js"></script>
+<script type="text/javascript" src="js/hammer.min.js"></script>
+<script type="text/javascript" src="js/jquery.superslides.js"></script>
+
+<link rel="stylesheet" href="css/normalize.css">
+<link rel="stylesheet" href="css/superslides.css">
+<link rel="stylesheet" href="css/layout.css">
+-->
+
+
+<script type="text/javascript">
+Number.prototype.mod = function(n) { return ((this%n)+n)%n; }
+$(document).ready(function() {
+	
+	function Comicbook(result) {	
+		result.sort(function(a,b) { return a.name < b.name ? -1 : b.name < a.name ? 1 : 0; });
+		console.log(result);
+		
+		var $pages = $('#pages');
+		var currentPage = 0;
+		var totalPages = result.length;
+		
+		loadPage(currentPage);
+//		var $pagesContainer = $pages.find('.pages-container');
+//		$.each(filearr, function(i, blob){
+//			$pagesContainer.append( '<img src="' + URL.createObjectURL(blob) + '" alt="' + tablearr[i].name + '">');
+//		});
+		
+		$('#pages .pages-navigation .next').bind('click', function(e) { 
+			prevPage();
+			e.preventDefault();
+		});
+		$('#pages .pages-navigation .prev').bind('click', function(e) {
+			nextPage();
+			e.preventDefault();
+		});
+		
+		$('#pages .pages-container img').hide();
+		$('#pages .pages-container img:eq(0)').show()
+		
+		function update(toHide, toShow) {
+			console.log('toHide: ' + toHide + ' toShow: ' + toShow);
+			$('#pages .pages-container img:eq(' + toHide + ')').fadeOut('fast', function() {
+				$('#pages .pages-container img:eq(' + toShow + ')').fadeIn('fast');
+			});
+		}
+		
+		function nextPage() {
+			nextImage = (currentPage-1)%totalPages;
+			console.log( nextImage + ' total: ' + totalPages )
+			update(currentPage, nextImage);
+			currentPage = nextImage;
+		}
+		
+		function prevPage() {
+			nextImage = (currentPage+1)%totalPages;
+			console.log( nextImage + ' total: ' + totalPages )
+			update(currentPage, nextImage);
+			currentPage = nextImage;
+		}
+		
+		function loadPage(i) {
+			$('#pages .pages-container').append( '<img src="' + URL.createObjectURL(filearr[i].blob) + '" alt="' + filearr[i].name + '">');
+		}
+		
+		var triggerOffset = 100
+		$(window).scroll(function () {
+			if ($(window).scrollTop() + $(window).height() > $(document).height() - triggerOffset) { 
+				if (currentPage < totalPages-1) loadPage( ++currentPage );
+			}
+		});
+	}
+	
+	//HTML5 Upload by http://techpages.com
+	//File, Directory, Archive, or External Image Uploader using Imgur API, HTML5 FormData, ZIPjs, and Cross-Domain XHR
+	var filearr = [];
+
+	var output = document.getElementById("output");
+
+	/* Main unzip function */
+	function unzip(zip){
+		model.getEntries(zip, function(entries) {
+			entries.forEach(function(entry) {
+				model.getEntryFile(entry, "Blob");
+			});
+		});
+	}
+
+	/* Drag'n drop stuff */
+	var drag = document.getElementById("drag");
+	drag.ondragover = function(e){
+		e.preventDefault()
+	};
+
+
+	drag.ondrop = function(e) {	  
+		var length = e.dataTransfer.items.length;
+		for (var i = 0; i < length; i++) {
+			var entry = e.dataTransfer.items[i].webkitGetAsEntry();
+			var file = e.dataTransfer.files[i];
+			var zip = file.name.match(/\.zip/) || file.name.match(/\.cbz/);
+			var rar = file.name.match(/\.rar/) || file.name.match(/\.cbr/);
+			if (entry.isFile) {
+				if(zip){
+					unzip(file);
+				} else if(rar){
+					unrar(file);
+				} else {  
+					output.innerHTML = "This is not a zip or rar file.";        
+				}
+				if(i==length-1){
+					Comicbook(tablearr);
+				}
+			} else {
+				output.innerHTML = "Please drag and drop a zip or rar file."; 
+			}
+		}
+		e.preventDefault();
+	}
+
+	//process archive
+	var zipinput = document.getElementById("zipinput");
+	zipinput.addEventListener('change', function() {
+		var name = zipinput.files[0].name;
+		var type = name.substr(name.length-3,3);
+		if(type == "zip" || type == "cbz"){
+			unzip(zipinput.files[0]);
+		} else if(type == "rar" || type == "cbr"){
+			unrar(zipinput.files[0]);
+		} else {
+			output.innerHTML = "This is not a zip or rar archive."; 
+		}
+		
+	}, false);
+
+	var zbutton = document.getElementById("zbutton");
+	zbutton.addEventListener("click", function() {
+		document.getElementById('zipinput').click()
+	}, false);
+
+
+	var count = 0;
+	var entries;
+
+	function callback(a,b){
+		if(a){
+			output.innerHTML = a; //errors
+		} else {
+			count++;
+			filearr.push({
+				"name":entries[count-1].name,
+				"type":b.type,
+				"size":b.size,
+				"blob":b
+			});
+			if(count==entries.length){
+				Comicbook(filearr);
+			}
+		}
+	}
+
+
+	//https://github.com/43081j/rar.js
+	function unrar(rar){
+		count=0;
+		RarArchive(rar, function(err) {
+			self = this;
+			if(err) {
+				console.log(err);
+				return;
+			}
+			this.entries.forEach(function(file) {
+				self.get(file,callback);
+			});
+			entries = this.entries;
+		});
+	}
+
+
+
+	//model for zip.js
+	//https://github.com/gildas-lormeau/zip.js
+	var model = (function() {
+
+		var URL = window.webkitURL || window.mozURL || window.URL;
+		var acount = 0;
+		var bcount = 0;
+
+		//compile a list of file extensions and content types
+		//http://webdesign.about.com/od/multimedia/a/mime-types-by-content-type.htm
+		var mapping = {
+			"pdf":"application/pdf",
+			"zip":"application/zip",
+			"cbz":"application/zip",
+			"rar":"application/rar",
+			"cbr":"application/rar",
+			"json":"application/json",
+			"mid":"audio/mid",
+			"mp3":"audio/mpeg",
+			"bmp":"image/bmp",
+			"gif":"image/gif",
+			"png":"image/png",
+			"jpg":"image/jpeg",
+			"jpeg":"image/jpeg",
+			"svg":"image/svg+xml",
+			"xml":"text/xml"
+		}
+
+
+		return {
+			getEntries : function(file, onend) {
+				zip.createReader(new zip.BlobReader(file), function(zipReader) {
+					zipReader.getEntries(onend);
+				}, onerror);
+			},
+			getEntryFile : function(entry, creationMethod, onend, onprogress) {
+
+				acount++;
+
+				var writer, zipFileEntry;
+
+				function getData() {
+					entry.getData(writer, function(blob) {
+						bcount++;
+						filearr.push({
+							"name":entry.filename,
+							"type":blob.type,
+							"size":blob.size,
+							"blob":blob
+						});
+						if(acount == bcount){
+							Comicbook(filearr);
+						}			 
+					}, onprogress);
+				}
+					
+				//console.log(entry);
+				var extension = entry.filename.substring(entry.filename.indexOf(".")+1);
+				var mime = mapping[extension] || 'text/plain';
+				//console.log(mime);
+
+				writer = new zip.BlobWriter(mime);
+				getData();
+			}
+		};
+	})();
+});
+</script>
+</body>
+</html>
